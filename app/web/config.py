@@ -28,9 +28,9 @@ class BotConfig:
 class DatabaseConfig:
     host: str = "localhost"
     port: int = 5432
-    user: str = "postgres"
-    password: str = "postgres"
-    database: str = "project"
+    user: str = "kts_user"
+    password: str = "kts_pass"
+    database: str = "kts"
 
 
 @dataclass

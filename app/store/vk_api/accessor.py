@@ -32,6 +32,7 @@ class VkApiAccessor(BaseAccessor):
         self.ts: int | None = None
 
     async def connect(self, app: "Application") -> None:
+        return
         self.session = ClientSession(connector=TCPConnector(verify_ssl=False))
 
         try:

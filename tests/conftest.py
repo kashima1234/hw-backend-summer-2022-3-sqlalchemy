@@ -4,9 +4,10 @@ from asyncio import AbstractEventLoop
 from collections.abc import Iterator
 from hashlib import sha256
 
+import aiohttp
 from aiohttp.pytest_plugin import AiohttpClient
 from aiohttp.test_utils import TestClient, loop_context
-from sqlalchemy import inspect, select, text
+from sqlalchemy import inspect, select, text, cast, String
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -83,7 +84,7 @@ async def clear_db(application: Application) -> Iterator[None]:
     finally:
         session = AsyncSession(application.database.engine)
         connection = session.connection()
-        for table in application.database._db.metadata.tables:
+        for table in application.database.db.metadata.tables:
             await session.execute(text(f"TRUNCATE {table} CASCADE"))
             await session.execute(
                 text(f"ALTER SEQUENCE {table}_id_seq RESTART WITH 1")
@@ -108,15 +109,18 @@ def cli(
 
 
 @pytest.fixture
-async def auth_cli(cli: TestClient, config: Config) -> TestClient:
-    await cli.post(
+async def auth_cli(aiohttp_client: AiohttpClient, config: Config, application: Application) -> TestClient:
+    cookie_jar = aiohttp.CookieJar(unsafe=True)
+    auth_client = await aiohttp_client(application, cookie_jar=cookie_jar)
+
+    await auth_client.post(
         path="/admin.login",
         json={
             "email": config.admin.email,
             "password": config.admin.password,
         },
     )
-    return cli
+    return auth_client
 
 
 @pytest.fixture
@@ -128,7 +132,7 @@ async def admin(cli, db_sessionmaker, config: Config) -> AdminModel:
 
     async with db_sessionmaker.begin() as session:
         existed_admin = await session.scalar(
-            select(AdminModel).where(AdminModel.email == config.admin.email)
+            select(AdminModel).where(cast(AdminModel.email, String) == config.admin.email)
         )
         if existed_admin:
             return AdminModel(id=existed_admin.id, email=existed_admin.email)
